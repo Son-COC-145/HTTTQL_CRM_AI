@@ -1,0 +1,27 @@
+# --- Secrets / env files ---
+.env
+.env.*
+!.env.example
+
+# --- Python (ai-service) ---
+__pycache__/
+*.py[cod]
+venv/
+.venv/
+
+# --- Node (frontend) ---
+node_modules/
+dist/
+dist-ssr/
+*.local
+
+# --- Java/Maven (backend) ---
+target/
+*.jar
+*.war
+
+# --- IDE/OS ---
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db

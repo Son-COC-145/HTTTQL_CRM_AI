@@ -1,0 +1,15 @@
+services:
+  postgres:
+    image: postgres:16
+    container_name: crm_ai_postgres
+    environment:
+      POSTGRES_DB: crm_ai_db
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: 123456
+    ports:
+      - "5432:5432"
+    volumes:
+      - crm_ai_postgres_data:/var/lib/postgresql/data
+
+volumes:
+  crm_ai_postgres_data:
