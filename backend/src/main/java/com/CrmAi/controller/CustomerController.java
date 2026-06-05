@@ -43,4 +43,9 @@ public class CustomerController {
         customerService.deleteCustomer(id);
         return "Deleted customer successfully";
     }
+
+    @GetMapping("/top-potential")
+    public List<Customer> topPotential() {
+        return customerService.getTopPotentialCustomers();
+    }
 }

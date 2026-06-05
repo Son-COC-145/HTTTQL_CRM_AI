@@ -2,6 +2,8 @@ package com.CrmAi.dto;
 
 import lombok.*;
 
+import java.util.List;
+
 @Setter @Getter
 @NoArgsConstructor @AllArgsConstructor
 @Builder
@@ -20,4 +22,10 @@ public class DashboardDto {
     private Long coldCustomers;
 
     private Long pendingTasks;
+
+    private List<ChartDataDto> customerSources;
+
+    private List<ChartDataDto> customerStatuses;
+
+    private List<RevenueChartDto> monthlyRevenue;
 }

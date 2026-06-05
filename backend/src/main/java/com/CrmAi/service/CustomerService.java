@@ -44,4 +44,8 @@ public class CustomerService {
         Customer customer = getCustomerById(id);
         customerRepository.delete(customer);
     }
+
+    public List<Customer> getTopPotentialCustomers() {
+        return customerRepository.findTop5ByOrderByPotentialScoreDesc();
+    }
 }
