@@ -51,3 +51,25 @@ HTTTQL_CRM_AI/
 ├── frontend/
 ├── ai-service/
 └── docker-compose.yml
+```
+
+## 5. Cách chạy project
+
+### Bước 1: Chạy PostgreSQL
+-docker compose up -d
+#### Bước 2: Chạy Backend
+-cd backend
+-mvn spring-boot:run -Dspring-boot.run.jvmArguments="-Duser.timezone=UTC"
+### Bước 3: Chạy AI Service
+-Tạo file .env trong ai-service:
+GEMINI_API_KEY=your_gemini_api_key_here
+-Cài thư viện:
+cd ai-service
+python -m venv venv
+venv\Scripts\activate
+pip install -r requirements.txt
+uvicorn main:app --reload --port 8000
+### Bước 4: Chạy Frontend
+cd frontend
+npm install
+npm run dev
