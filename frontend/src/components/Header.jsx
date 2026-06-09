@@ -1,4 +1,11 @@
 function Header() {
+  const email = localStorage.getItem("email");
+
+  const logout = () => {
+    localStorage.clear();
+    window.location.reload();
+  };
+
   return (
     <header className="header">
       <div>
@@ -7,7 +14,10 @@ function Header() {
       </div>
 
       <div className="user-box">
-        <span>Admin</span>
+        <span>{email || "Admin"}</span>
+        <button className="secondary-btn" onClick={logout}>
+          Đăng xuất
+        </button>
       </div>
     </header>
   );

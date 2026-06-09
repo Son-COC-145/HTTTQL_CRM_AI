@@ -7,10 +7,14 @@ import AIRecommendation from "./pages/AIRecommendation";
 import CustomerDetail from "./pages/CustomerDetail";
 import Tasks from "./pages/Tasks";
 import AIChat from "./pages/AIChat";
+import Login from "./pages/Login";
+import Register from "./pages/Register";
 
 function App() {
   const [page, setPage] = useState("dashboard");
   const [selectedCustomerId, setSelectedCustomerId] = useState(null);
+  const [isAuth, setIsAuth] = useState(!!localStorage.getItem("token"));
+  const [authPage, setAuthPage] = useState("login");
 
   if (selectedCustomerId) {
     return (
@@ -22,6 +26,20 @@ function App() {
       </Layout>
     );
   }
+
+  if (!isAuth) {
+    return authPage === "login" ? (
+      <Login
+        onLogin={() => setIsAuth(true)}
+        goRegister={() => setAuthPage("register")}
+      />
+    ) : (
+      <Register
+        onRegister={() => setIsAuth(true)}
+        goLogin={() => setAuthPage("login")}
+      />
+    );
+  } 
 
   return (
     <Layout page={page} setPage={setPage}>
