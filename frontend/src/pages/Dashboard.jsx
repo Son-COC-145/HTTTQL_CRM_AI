@@ -67,7 +67,7 @@ function Dashboard() {
         </div>
 
         <div className="card stat-card">
-          <span>Task chờ xử lý</span>
+          <span>Task chưa hoàn thành</span>
           <strong>{stats.pendingTasks}</strong>
         </div>
       </div>

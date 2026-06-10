@@ -1,6 +1,7 @@
 import { useState } from "react";
 import api from "../api/api";
 import { toast } from "react-toastify";
+import ReactMarkdown from "react-markdown";
 
 function AIChat() {
   const [question, setQuestion] = useState("");
@@ -77,7 +78,11 @@ function AIChat() {
             >
               <div className={`chat-bubble ${msg.role}`}>
                 {msg.role === "user" ? "👤 " : "🤖 "}
-                {msg.text}
+                {msg.role === "ai" ? (
+                  <ReactMarkdown>{msg.text}</ReactMarkdown>
+                ) : (
+                  msg.text
+                )}
               </div>
             </div>
           ))}

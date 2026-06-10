@@ -54,7 +54,7 @@ public class DashboardService {
                 .hotCustomers(customerRepository.countByPotentialScoreGreaterThanEqual(80))
                 .warmCustomers(customerRepository.countByPotentialScoreBetween(60, 79))
                 .coldCustomers(customerRepository.countByPotentialScoreLessThan(60))
-                .pendingTasks(taskRepository.countByStatus("TODO"))
+                .pendingTasks(taskRepository.countByStatusIn(List.of("TODO", "IN_PROGRESS")))
                 .customerSources(customerSources)
                 .customerStatuses(customerStatuses)
                 .monthlyRevenue(monthlyRevenue)

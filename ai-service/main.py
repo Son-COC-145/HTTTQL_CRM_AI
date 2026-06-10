@@ -163,6 +163,9 @@ Yêu cầu:
 - Ngắn gọn, dễ hiểu
 - Dựa trên dữ liệu CRM được cung cấp
 - Nếu phù hợp, hãy đề xuất hành động chăm sóc khách hàng
+- Trình bày gọn, hạn chế dòng trống
+- Không chèn nhiều dòng trắng giữa các ý
+- Mỗi ý chỉ cách nhau 1 dòng
 """
 
     try:
