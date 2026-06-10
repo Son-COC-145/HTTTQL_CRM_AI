@@ -165,8 +165,14 @@ Yêu cầu:
 - Nếu phù hợp, hãy đề xuất hành động chăm sóc khách hàng
 """
 
-    response = model.generate_content(prompt)
+    try:
+        response = model.generate_content(prompt)
 
-    return {
-        "answer": response.text
-    }
+        return {
+            "answer": response.text
+        }
+
+    except Exception as e:
+        return {
+            "answer": "AI hiện đang tạm thời quá tải hoặc vượt giới hạn quota Gemini. Vui lòng thử lại sau."
+        }

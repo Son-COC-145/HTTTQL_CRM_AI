@@ -1,89 +1,96 @@
 import { useEffect, useState } from "react";
 import api from "../api/api";
+import { toast } from "react-toastify";
+
+function getScoreClass(score) {
+  if (score >= 80) return "score-hot";
+  if (score >= 60) return "score-warm";
+  return "score-cold";
+}
 
 function AIAnalysis() {
-    const [customers, setCustomers] = useState([]);
-    const [result, setResult] = useState(null);
-    const [loading, setLoading] = useState(false);
+  const [customers, setCustomers] = useState([]);
+  const [result, setResult] = useState(null);
+  const [selectedCustomer, setSelectedCustomer] = useState(null);
+  const [loading, setLoading] = useState(false);
 
-    useEffect(() => {
-        api.get("/customers")
-            .then((res) => setCustomers(res.data))
-            .catch(console.error);
-    }, []);
+  useEffect(() => {
+    api.get("/customers")
+      .then((res) => setCustomers(res.data))
+      .catch(() => toast.error("Không thể tải danh sách khách hàng!"));
+  }, []);
 
-    const analyzeCustomer = async (customerId) => {
-        try {
-            setLoading(true);
+  const analyzeCustomer = async (customer) => {
+    try {
+      setLoading(true);
+      setSelectedCustomer(customer);
 
-            const res = await api.post(`/ai/analyze-customer/${customerId}`);
+      const res = await api.post(`/ai/analyze-customer/${customer.id}`);
+      setResult(res.data);
 
-            setResult(res.data);
-        } catch (error) {
-            console.error(error);
-        } finally {
-            setLoading(false);
-        }
-    };
+      toast.success("Phân tích AI hoàn tất!");
+    } catch (error) {
+      console.error(error);
+      toast.error("Phân tích AI thất bại!");
+    } finally {
+      setLoading(false);
+    }
+  };
 
-    return (
-        <div>
-            <h1>AI Customer Analysis</h1>
+  return (
+    <div>
+      <h1 className="page-title">AI Customer Analysis</h1>
+      <p className="page-subtitle">
+        Phân tích tiềm năng khách hàng dựa trên dữ liệu CRM và Gemini AI.
+      </p>
 
-            <table border="1" cellPadding="10">
-                <thead>
-                    <tr>
-                        <th>Khách hàng</th>
-                        <th>Điểm AI</th>
-                        <th>Thao tác</th>
-                    </tr>
-                </thead>
+      <div className="ai-card-grid">
+        {customers.map((customer) => (
+          <div className="ai-customer-card" key={customer.id}>
+            <h3>{customer.fullName}</h3>
 
-                <tbody>
-                    {customers.map((customer) => (
-                        <tr key={customer.id}>
-                            <td>{customer.fullName}</td>
-                            <td>{customer.potentialScore}</td>
+            <p>Nguồn: {customer.source}</p>
+            <p>Trạng thái: {customer.status}</p>
 
-                            <td>
-                                <button onClick={() => analyzeCustomer(customer.id)}>
-                                    Phân tích AI
-                                </button>
-                            </td>
-                        </tr>
-                    ))}
-                </tbody>
-            </table>
+            <span className={`score-badge ${getScoreClass(customer.potentialScore)}`}>
+              {customer.potentialScore} điểm
+            </span>
 
-            {loading && <p>Đang phân tích...</p>}
+            <div style={{ marginTop: "16px" }}>
+              <button
+                className="primary-btn"
+                onClick={() => analyzeCustomer(customer)}
+                disabled={loading}
+              >
+                {loading && selectedCustomer?.id === customer.id
+                  ? "Đang phân tích..."
+                  : "Phân tích AI"}
+              </button>
+            </div>
+          </div>
+        ))}
+      </div>
 
-            {result && (
-                <div style={{marginTop: "20px", border: "1px solid #ccc", padding: "20px",}}>
-                    <h2>Kết quả AI</h2>
+      {result && (
+        <div className="ai-result-card">
+          <h2>Kết quả phân tích</h2>
 
-                    <p>
-                        <strong>Điểm:</strong>{" "}
-                        {result.potentialScore}
-                    </p>
+          <p>
+            Khách hàng: <strong>{selectedCustomer?.fullName}</strong>
+          </p>
 
-                    <p>
-                        <strong>Level:</strong>{" "}
-                        {result.level}
-                    </p>
+          <div className="ai-result-score">{result.potentialScore}</div>
 
-                    <p>
-                        <strong>Tóm tắt:</strong>
-                        {result.summary}
-                    </p>
+          <h2>{result.level}</h2>
 
-                    <p>
-                        <strong>Đề xuất:</strong>{" "}
-                        {result.suggestedAction}
-                    </p>
-                </div>
-            )}
+          <p>{result.summary}</p>
+
+          <h3>Đề xuất chăm sóc</h3>
+          <p>{result.suggestedAction}</p>
         </div>
-    );
+      )}
+    </div>
+  );
 }
 
 export default AIAnalysis;

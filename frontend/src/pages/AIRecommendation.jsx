@@ -1,89 +1,98 @@
 import { useEffect, useState } from "react";
 import api from "../api/api";
+import { toast } from "react-toastify";
+
+function getScoreClass(score) {
+  if (score >= 80) return "score-hot";
+  if (score >= 60) return "score-warm";
+  return "score-cold";
+}
 
 function AIRecommendation() {
   const [customers, setCustomers] = useState([]);
   const [recommendation, setRecommendation] = useState(null);
+  const [selectedCustomer, setSelectedCustomer] = useState(null);
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
     api.get("/customers")
       .then((res) => setCustomers(res.data))
-      .catch(console.error);
+      .catch(() => toast.error("Không thể tải danh sách khách hàng!"));
   }, []);
 
-  const getRecommendation = async (customerId) => {
+  const getRecommendation = async (customer) => {
     try {
       setLoading(true);
+      setSelectedCustomer(customer);
 
-      const res = await api.post(`/ai/recommend-action/${customerId}`);
+      const res = await api.post(`/ai/recommend-action/${customer.id}`);
       setRecommendation(res.data);
+
+      toast.success("Đã tạo gợi ý chăm sóc!");
     } catch (error) {
       console.error(error);
+      toast.error("Tạo gợi ý thất bại!");
     } finally {
       setLoading(false);
     }
   };
 
   return (
-    <div style={{ padding: "24px" }}>
-      <h1>AI Recommendation</h1>
+    <div>
+      <h1 className="page-title">AI Recommendation</h1>
+      <p className="page-subtitle">
+        Đề xuất hành động chăm sóc phù hợp cho từng khách hàng.
+      </p>
 
-      <table border="1" cellPadding="10" style={{ width: "100%" }}>
-        <thead>
-          <tr>
-            <th>Khách hàng</th>
-            <th>Điểm AI</th>
-            <th>Trạng thái</th>
-            <th>Thao tác</th>
-          </tr>
-        </thead>
+      <div className="ai-card-grid">
+        {customers.map((customer) => (
+          <div className="ai-customer-card" key={customer.id}>
+            <h3>{customer.fullName}</h3>
 
-        <tbody>
-          {customers.map((customer) => (
-            <tr key={customer.id}>
-              <td>{customer.fullName}</td>
-              <td>{customer.potentialScore}</td>
-              <td>{customer.status}</td>
-              <td>
-                <button onClick={() => getRecommendation(customer.id)}>
-                  Gợi ý chăm sóc
-                </button>
-              </td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
+            <p>Trạng thái: {customer.status}</p>
+            <p>Nguồn: {customer.source}</p>
 
-      {loading && <p>Đang tạo gợi ý...</p>}
+            <span className={`score-badge ${getScoreClass(customer.potentialScore)}`}>
+              {customer.potentialScore} điểm
+            </span>
+
+            <div style={{ marginTop: "16px" }}>
+              <button
+                className="primary-btn"
+                onClick={() => getRecommendation(customer)}
+                disabled={loading}
+              >
+                {loading && selectedCustomer?.id === customer.id
+                  ? "Đang tạo..."
+                  : "Gợi ý chăm sóc"}
+              </button>
+            </div>
+          </div>
+        ))}
+      </div>
 
       {recommendation && (
-        <div style={resultBox}>
+        <div className="card" style={{ marginTop: "24px" }}>
           <h2>Đề xuất cho {recommendation.customerName}</h2>
 
           <p>
-            <strong>Mức ưu tiên:</strong> {recommendation.priority}
+            <strong>Mức ưu tiên:</strong>{" "}
+            <span className="score-badge score-hot">
+              {recommendation.priority}
+            </span>
           </p>
 
-          <h3>Hành động nên thực hiện:</h3>
-
-          <ul>
+          <div className="recommendation-list">
             {recommendation.recommendations.map((item, index) => (
-              <li key={index}>{item}</li>
+              <div className="recommendation-item" key={index}>
+                ✓ {item}
+              </div>
             ))}
-          </ul>
+          </div>
         </div>
       )}
     </div>
   );
 }
-
-const resultBox = {
-  marginTop: "24px",
-  padding: "20px",
-  border: "1px solid #ddd",
-  borderRadius: "12px",
-  background: "#fff",
-};
 
 export default AIRecommendation;
