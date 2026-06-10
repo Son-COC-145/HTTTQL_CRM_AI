@@ -6,6 +6,10 @@ function Customers({ onSelectCustomer }) {
   const [customers, setCustomers] = useState([]);
   const [editingId, setEditingId] = useState(null);
   const [loading, setLoading] = useState(false);
+  const [search, setSearch] = useState("");
+  const [statusFilter, setStatusFilter] = useState("ALL");
+  const [sourceFilter, setSourceFilter] = useState("ALL");
+  const [sortBy, setSortBy] = useState("DEFAULT");
 
   const emptyForm = {
     fullName: "",
@@ -103,6 +107,35 @@ function Customers({ onSelectCustomer }) {
     }
   };
 
+  const filteredCustomers = customers
+  .filter((customer) => {
+    const keyword = search.toLowerCase();
+
+    const matchSearch =
+      customer.fullName?.toLowerCase().includes(keyword) ||
+      customer.email?.toLowerCase().includes(keyword) ||
+      customer.phone?.includes(keyword);
+
+    const matchStatus =
+      statusFilter === "ALL" || customer.status === statusFilter;
+
+    const matchSource =
+      sourceFilter === "ALL" || customer.source === sourceFilter;
+
+    return matchSearch && matchStatus && matchSource;
+  })
+  .sort((a, b) => {
+    if (sortBy === "SCORE_DESC") {
+      return b.potentialScore - a.potentialScore;
+    }
+
+    if (sortBy === "SCORE_ASC") {
+      return a.potentialScore - b.potentialScore;
+    }
+
+    return 0;
+  });
+
   return (
     <div>
       <h1>Quản lý khách hàng</h1>
@@ -179,6 +212,35 @@ function Customers({ onSelectCustomer }) {
       <div className="card">
         <h2>Danh sách khách hàng</h2>
 
+        <div className="filter-bar">
+          <input
+            placeholder="Tìm theo tên, email, số điện thoại..."
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+          />
+
+          <select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)}>
+            <option value="ALL">Tất cả trạng thái</option>
+            <option value="LEAD">LEAD</option>
+            <option value="POTENTIAL">POTENTIAL</option>
+            <option value="CUSTOMER">CUSTOMER</option>
+            <option value="INACTIVE">INACTIVE</option>
+          </select>
+
+          <select value={sourceFilter} onChange={(e) => setSourceFilter(e.target.value)}>
+            <option value="ALL">Tất cả nguồn</option>
+            <option value="Facebook">Facebook</option>
+            <option value="Website">Website</option>
+            <option value="Zalo">Zalo</option>
+            <option value="Referral">Referral</option>
+          </select>
+
+          <select value={sortBy} onChange={(e) => setSortBy(e.target.value)}>
+            <option value="DEFAULT">Mặc định</option>
+            <option value="SCORE_DESC">Điểm AI cao → thấp</option>
+            <option value="SCORE_ASC">Điểm AI thấp → cao</option>
+          </select>
+        </div>
         {loading ? (
           <p>Đang tải dữ liệu...</p>
         ) : (
@@ -197,7 +259,7 @@ function Customers({ onSelectCustomer }) {
             </thead>
 
             <tbody>
-              {customers.map((customer) => (
+              {filteredCustomers.map((customer) => (
                 <tr key={customer.id}>
                   <td>{customer.id}</td>
                   <td>{customer.fullName}</td>
