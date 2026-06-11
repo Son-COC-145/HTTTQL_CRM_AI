@@ -1,27 +1,24 @@
+import os
 import json
 import psycopg2
 import numpy as np
 
+from dotenv import load_dotenv
 from services.embedding_service import create_embedding
 
 
-# ===========================
-# Kết nối PostgreSQL
-# ===========================
+load_dotenv()
+
 
 def get_connection():
     return psycopg2.connect(
-        host="localhost",
-        port=5432,
-        database="crm_ai_db",
-        user="postgres",
-        password="123456"
+        host=os.getenv("DB_HOST", "localhost"),
+        port=int(os.getenv("DB_PORT", "5432")),
+        database=os.getenv("DB_NAME", "crm_ai_db"),
+        user=os.getenv("DB_USER", "postgres"),
+        password=os.getenv("DB_PASSWORD", "123456"),
     )
 
-
-# ===========================
-# Tính Cosine Similarity
-# ===========================
 
 def cosine_similarity(a, b):
     a = np.array(a)
@@ -36,21 +33,13 @@ def cosine_similarity(a, b):
     return float(np.dot(a, b) / (norm_a * norm_b))
 
 
-# ===========================
-# Semantic Search
-# ===========================
-
-def retrieve(question, limit=5):
-
-    # Sinh embedding cho câu hỏi
+def retrieve(question, limit=5, similarity_threshold=0.4):
     question_embedding = create_embedding(question)
 
     conn = get_connection()
 
     try:
-
         with conn.cursor() as cur:
-
             cur.execute("""
                 SELECT
                     customer_id,
@@ -63,15 +52,12 @@ def retrieve(question, limit=5):
             rows = cur.fetchall()
 
     finally:
-        # Luôn đóng kết nối kể cả khi xảy ra Exception
         conn.close()
 
     results = []
 
     for customer_id, content, embedding_json in rows:
-
         try:
-
             embedding = json.loads(embedding_json)
 
             similarity = cosine_similarity(
@@ -79,17 +65,16 @@ def retrieve(question, limit=5):
                 embedding
             )
 
-            results.append({
-                "customerId": customer_id,
-                "content": content,
-                "score": similarity
-            })
+            if similarity >= similarity_threshold:
+                results.append({
+                    "customerId": customer_id,
+                    "content": content,
+                    "score": similarity
+                })
 
         except Exception:
-            # Bỏ qua embedding lỗi
             continue
 
-    # Sắp xếp theo độ tương đồng giảm dần
     results.sort(
         key=lambda item: item["score"],
         reverse=True

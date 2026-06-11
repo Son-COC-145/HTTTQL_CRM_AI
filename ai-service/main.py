@@ -3,17 +3,24 @@ import json
 import re
 from typing import Optional
 
+import joblib
+import pandas as pd
+import numpy as np
+
 from dotenv import load_dotenv
 from fastapi import FastAPI
 from pydantic import BaseModel
 import google.generativeai as genai
+from sklearn.linear_model import LinearRegression
 
-from ml_scoring import calculate_ml_score, calculate_ml_score_with_reasons, get_level
+from rule_based_scoring import (
+    calculate_rule_score,
+    calculate_rule_score_with_reasons,
+    get_level,
+)
 from rag.semantic_search import retrieve
 from services.embedding_service import create_embedding
 
-from sklearn.linear_model import LinearRegression
-import numpy as np
 
 app = FastAPI(title="CRM AI Service")
 
@@ -22,6 +29,18 @@ load_dotenv()
 genai.configure(api_key=os.getenv("GEMINI_API_KEY"))
 
 model = genai.GenerativeModel("gemini-3.5-flash")
+
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+MODEL_PATH = os.path.join(BASE_DIR, "lead_scoring_model.pkl")
+
+try:
+    ml_model = joblib.load(MODEL_PATH)
+    print("Loaded RandomForest lead scoring model successfully.")
+except Exception as e:
+    ml_model = None
+    print("Warning: lead_scoring_model.pkl not found or cannot be loaded.")
+    print(e)
+
 
 def parse_json_response(text: str):
     raw_text = text.strip()
@@ -37,6 +56,42 @@ def parse_json_response(text: str):
         raw_text = raw_text[start:end + 1]
 
     return json.loads(raw_text)
+
+
+def predict_lead_score(data):
+    if ml_model is None:
+        score, _ = calculate_rule_score_with_reasons(data)
+        return score
+
+    try:
+        input_df = pd.DataFrame([{
+            "interaction_count": data.interaction_count,
+            "order_count": data.order_count,
+            "total_spent": data.total_spent,
+            "task_count": data.task_count,
+            "status": data.status or "LEAD",
+            "source": data.source or "Other",
+        }])
+
+        probabilities = ml_model.predict_proba(input_df)[0]
+
+        classifier = ml_model.named_steps["classifier"]
+        classes = list(classifier.classes_)
+
+        if 1 in classes:
+            class_index = classes.index(1)
+        else:
+            class_index = 1
+
+        probability = probabilities[class_index]
+        score = int(probability * 100)
+
+        return max(0, min(score, 100))
+
+    except Exception as e:
+        print("ML prediction error, fallback to rule-based scoring:", e)
+        score, _ = calculate_rule_score_with_reasons(data)
+        return score
 
 
 class CustomerAIRequest(BaseModel):
@@ -64,12 +119,15 @@ class ChatRequest(BaseModel):
     question: str
     context: Optional[str] = ""
 
+
 class EmbeddingRequest(BaseModel):
     customerId: int
     content: str
 
+
 class RevenueForecastRequest(BaseModel):
     monthlyRevenue: list
+
 
 class ChurnRiskRequest(BaseModel):
     customer_id: int
@@ -81,6 +139,7 @@ class ChurnRiskRequest(BaseModel):
     total_spent: float = 0
     task_count: int = 0
 
+
 @app.get("/")
 def health_check():
     return {
@@ -90,13 +149,16 @@ def health_check():
 
 @app.post("/ai/analyze-customer")
 def analyze_customer(data: CustomerAIRequest):
-    score, reasons = calculate_ml_score_with_reasons(data)
+    _, reasons = calculate_rule_score_with_reasons(data)
+
+    score = predict_lead_score(data)
     level = get_level(score)
 
     prompt = f"""
 Bạn là chuyên gia CRM.
 
-Điểm tiềm năng của khách hàng đã được tính bằng mô hình Machine Learning.
+Điểm tiềm năng của khách hàng đã được tính bằng mô hình Machine Learning Random Forest.
+Các lý do giải thích được sinh từ tập luật nghiệp vụ nhằm hỗ trợ Explainable AI.
 
 Thông tin khách hàng:
 - Tên: {data.full_name}
@@ -109,6 +171,7 @@ Thông tin khách hàng:
 - Số task chăm sóc: {data.task_count}
 - Điểm ML: {score}
 - Nhóm: {level}
+- Lý do giải thích: {reasons}
 
 Yêu cầu:
 Trả về JSON hợp lệ:
@@ -138,7 +201,7 @@ Chỉ trả về JSON.
         return {
             "potentialScore": score,
             "level": level,
-            "summary": f"{data.full_name} được mô hình ML đánh giá thuộc nhóm {level} với điểm {score}.",
+            "summary": f"{data.full_name} được mô hình Random Forest đánh giá thuộc nhóm {level} với điểm {score}.",
             "suggestedAction": "Nên tiếp tục chăm sóc khách hàng dựa trên mức độ tiềm năng và lịch sử tương tác.",
             "reasons": reasons
         }
@@ -179,6 +242,7 @@ Chỉ trả về JSON.
     try:
         response = model.generate_content(prompt)
         result = parse_json_response(response.text)
+
     except Exception:
         result = {
             "customerId": data.customer_id,
@@ -200,6 +264,7 @@ def chat(data: ChatRequest):
         rag_docs = retrieve(data.question)
 
         rag_text = ""
+
         if rag_docs:
             rag_text = "\n".join(
                 [doc["content"] for doc in rag_docs]
@@ -251,19 +316,17 @@ Yêu cầu:
             "answer": "AI hiện đang tạm thời quá tải, chưa có dữ liệu RAG hoặc vượt giới hạn quota Gemini. Vui lòng thử lại sau.",
             "error": str(e)
         }
-    
+
+
 @app.post("/embedding")
 def embedding(data: EmbeddingRequest):
-
     vector = create_embedding(data.content)
 
     return {
-
         "customerId": data.customerId,
-
         "embedding": vector
-
     }
+
 
 @app.post("/ai/forecast-revenue")
 def forecast_revenue(data: RevenueForecastRequest):
@@ -288,6 +351,7 @@ def forecast_revenue(data: RevenueForecastRequest):
         "forecastRevenue": round(float(forecast), 2),
         "message": "Dự báo doanh thu tháng tiếp theo bằng Linear Regression"
     }
+
 
 @app.post("/ai/churn-risk")
 def churn_risk(data: ChurnRiskRequest):

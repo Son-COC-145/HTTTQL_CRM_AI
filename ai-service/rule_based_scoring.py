@@ -1,29 +1,15 @@
-def calculate_ml_score(customer):
-
+def calculate_rule_score(customer):
     score = 0
 
     score += customer.order_count * 15
-
     score += customer.interaction_count * 5
-
     score += customer.task_count * 2
-
     score += customer.total_spent / 1000000
 
     return min(round(score), 100)
 
 
-def get_level(score):
-
-    if score >= 80:
-        return "HOT"
-
-    if score >= 60:
-        return "WARM"
-
-    return "COLD"
-
-def calculate_ml_score_with_reasons(customer):
+def calculate_rule_score_with_reasons(customer):
     score = 30
     reasons = []
 
@@ -62,3 +48,13 @@ def calculate_ml_score_with_reasons(customer):
         reasons.append("Khách hàng chưa có nhiều dữ liệu tương tác, đơn hàng hoặc chi tiêu")
 
     return score, reasons
+
+
+def get_level(score):
+    if score >= 80:
+        return "HOT"
+
+    if score >= 60:
+        return "WARM"
+
+    return "COLD"
