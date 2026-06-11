@@ -1,5 +1,6 @@
 import os
 import json
+import re
 from typing import Optional
 
 from dotenv import load_dotenv
@@ -21,6 +22,21 @@ load_dotenv()
 genai.configure(api_key=os.getenv("GEMINI_API_KEY"))
 
 model = genai.GenerativeModel("gemini-3.5-flash")
+
+def parse_json_response(text: str):
+    raw_text = text.strip()
+
+    raw_text = re.sub(r"^```json\s*", "", raw_text)
+    raw_text = re.sub(r"^```\s*", "", raw_text)
+    raw_text = re.sub(r"\s*```$", "", raw_text)
+
+    start = raw_text.find("{")
+    end = raw_text.rfind("}")
+
+    if start != -1 and end != -1:
+        raw_text = raw_text[start:end + 1]
+
+    return json.loads(raw_text)
 
 
 class CustomerAIRequest(BaseModel):
@@ -108,7 +124,7 @@ Chỉ trả về JSON.
 
     try:
         response = model.generate_content(prompt)
-        result = json.loads(response.text)
+        result = parse_json_response(response.text)
 
         return {
             "potentialScore": score,
@@ -160,10 +176,9 @@ Không dùng markdown.
 Chỉ trả về JSON.
 """
 
-    response = model.generate_content(prompt)
-
     try:
-        result = json.loads(response.text)
+        response = model.generate_content(prompt)
+        result = parse_json_response(response.text)
     except Exception:
         result = {
             "customerId": data.customer_id,
@@ -184,18 +199,27 @@ def chat(data: ChatRequest):
     try:
         rag_docs = retrieve(data.question)
 
+        rag_text = ""
         if rag_docs:
-            rag_context = "\n".join(
+            rag_text = "\n".join(
                 [doc["content"] for doc in rag_docs]
             )
-        else:
-            rag_context = data.context or ""
+
+        backend_context = data.context or ""
+
+        combined_context = f"""
+Dữ liệu truy xuất từ Backend theo nghiệp vụ:
+{backend_context}
+
+Dữ liệu khách hàng liên quan truy xuất bằng RAG Semantic Search:
+{rag_text}
+"""
 
         prompt = f"""
 Bạn là trợ lý AI cho hệ thống CRM.
 
-Dữ liệu CRM liên quan được truy xuất bằng RAG:
-{rag_context}
+Dữ liệu CRM:
+{combined_context}
 
 Câu hỏi người dùng:
 {data.question}
@@ -203,7 +227,8 @@ Câu hỏi người dùng:
 Yêu cầu:
 - Trả lời bằng tiếng Việt
 - Ngắn gọn, dễ hiểu
-- Dựa trên dữ liệu CRM được cung cấp
+- Ưu tiên dữ liệu Backend nếu câu hỏi liên quan đến task, doanh thu, trạng thái hoặc nguồn khách hàng
+- Dùng dữ liệu RAG để bổ sung các khách hàng liên quan
 - Nếu phù hợp, hãy đề xuất hành động chăm sóc khách hàng
 - Trình bày gọn, hạn chế dòng trống
 - Không chèn nhiều dòng trắng giữa các ý
@@ -217,6 +242,7 @@ Yêu cầu:
 
         return {
             "answer": response.text,
+            "backendContext": backend_context,
             "ragContext": rag_docs
         }
 
