@@ -7,6 +7,9 @@ from fastapi import FastAPI
 from pydantic import BaseModel
 import google.generativeai as genai
 
+from ml_scoring import calculate_ml_score, get_level
+from rag.semantic_search import retrieve
+from services.embedding_service import create_embedding
 
 app = FastAPI(title="CRM AI Service")
 
@@ -40,7 +43,11 @@ class RecommendationRequest(BaseModel):
 
 class ChatRequest(BaseModel):
     question: str
-    context: str
+    context: Optional[str] = ""
+
+class EmbeddingRequest(BaseModel):
+    customerId: int
+    content: str
 
 
 @app.get("/")
@@ -52,13 +59,15 @@ def health_check():
 
 @app.post("/ai/analyze-customer")
 def analyze_customer(data: CustomerAIRequest):
-    prompt = f"""
-Bạn là AI phân tích khách hàng cho hệ thống CRM.
+    score = calculate_ml_score(data)
+    level = get_level(score)
 
-Hãy phân tích khách hàng sau và trả về DUY NHẤT JSON hợp lệ.
+    prompt = f"""
+Bạn là chuyên gia CRM.
+
+Điểm tiềm năng của khách hàng đã được tính bằng mô hình Machine Learning.
 
 Thông tin khách hàng:
-- ID: {data.customer_id}
 - Tên: {data.full_name}
 - Trạng thái: {data.status}
 - Nguồn: {data.source}
@@ -67,33 +76,39 @@ Thông tin khách hàng:
 - Số đơn hàng: {data.order_count}
 - Tổng chi tiêu: {data.total_spent}
 - Số task chăm sóc: {data.task_count}
+- Điểm ML: {score}
+- Nhóm: {level}
 
-Yêu cầu JSON:
+Yêu cầu:
+Trả về JSON hợp lệ:
 {{
-  "potentialScore": số nguyên từ 0 đến 100,
-  "level": "HOT" hoặc "WARM" hoặc "COLD",
   "summary": "tóm tắt ngắn bằng tiếng Việt",
   "suggestedAction": "hành động chăm sóc đề xuất bằng tiếng Việt"
 }}
 
-Không giải thích thêm.
 Không dùng markdown.
+Không giải thích thêm.
 Chỉ trả về JSON.
 """
 
-    response = model.generate_content(prompt)
-
     try:
+        response = model.generate_content(prompt)
         result = json.loads(response.text)
-    except Exception:
-        result = {
-            "potentialScore": 50,
-            "level": "WARM",
-            "summary": response.text,
-            "suggestedAction": "Tiếp tục chăm sóc và theo dõi phản hồi của khách hàng."
+
+        return {
+            "potentialScore": score,
+            "level": level,
+            "summary": result.get("summary", ""),
+            "suggestedAction": result.get("suggestedAction", "")
         }
 
-    return result
+    except Exception:
+        return {
+            "potentialScore": score,
+            "level": level,
+            "summary": f"{data.full_name} được mô hình ML đánh giá thuộc nhóm {level} với điểm {score}.",
+            "suggestedAction": "Nên tiếp tục chăm sóc khách hàng dựa trên mức độ tiềm năng và lịch sử tương tác."
+        }
 
 
 @app.post("/ai/recommend-action")
@@ -149,11 +164,21 @@ Chỉ trả về JSON.
 
 @app.post("/ai/chat")
 def chat(data: ChatRequest):
-    prompt = f"""
+    try:
+        rag_docs = retrieve(data.question)
+
+        if rag_docs:
+            rag_context = "\n".join(
+                [doc["content"] for doc in rag_docs]
+            )
+        else:
+            rag_context = data.context or ""
+
+        prompt = f"""
 Bạn là trợ lý AI cho hệ thống CRM.
 
-Dữ liệu CRM:
-{data.context}
+Dữ liệu CRM liên quan được truy xuất bằng RAG:
+{rag_context}
 
 Câu hỏi người dùng:
 {data.question}
@@ -166,16 +191,33 @@ Yêu cầu:
 - Trình bày gọn, hạn chế dòng trống
 - Không chèn nhiều dòng trắng giữa các ý
 - Mỗi ý chỉ cách nhau 1 dòng
+- Không chèn dòng trống giữa các mục danh sách
+- Không dùng nhiều đoạn văn trong cùng một mục bullet/number
+- Mỗi khách hàng viết trong 1 dòng hoặc tối đa 2 dòng
 """
 
-    try:
         response = model.generate_content(prompt)
 
         return {
-            "answer": response.text
+            "answer": response.text,
+            "ragContext": rag_docs
         }
 
     except Exception as e:
         return {
-            "answer": "AI hiện đang tạm thời quá tải hoặc vượt giới hạn quota Gemini. Vui lòng thử lại sau."
+            "answer": "AI hiện đang tạm thời quá tải, chưa có dữ liệu RAG hoặc vượt giới hạn quota Gemini. Vui lòng thử lại sau.",
+            "error": str(e)
         }
+    
+@app.post("/embedding")
+def embedding(data: EmbeddingRequest):
+
+    vector = create_embedding(data.content)
+
+    return {
+
+        "customerId": data.customerId,
+
+        "embedding": vector
+
+    }

@@ -531,8 +531,8 @@ textarea {
   max-width: 70%;
   padding: 14px 16px;
   border-radius: 16px;
-  line-height: 1.5;
-  white-space: pre-wrap;
+  line-height: 1.4;
+  white-space: normal;
 }
 
 .chat-bubble.user {
@@ -545,6 +545,7 @@ textarea {
   background: #f3f4f6;
   color: #111827;
   border-bottom-left-radius: 4px;
+  line-height: 1.35;
 }
 
 .chat-form {
@@ -556,18 +557,6 @@ textarea {
 .chat-form input {
   flex: 1;
   height: 46px;
-}
-
-.status-badge {
-  padding: 6px 12px;
-  border-radius: 999px;
-  font-size: 13px;
-  font-weight: 700;
-}
-
-.status-todo {
-  background: #fef3c7;
-  color: #92400e;
 }
 
 .status-in_progress {
@@ -619,30 +608,21 @@ textarea {
   color: #1d4ed8;
 }
 
-.status-done {
-  background: #dcfce7;
-  color: #166534;
-}
-
-.chat-bubble.ai {
-  line-height: 1.45;
-}
-
 .chat-bubble.ai p {
-  margin: 4px 0;
+  margin: 2px 0;
 }
 
 .chat-bubble.ai h1,
 .chat-bubble.ai h2,
 .chat-bubble.ai h3 {
-  margin: 8px 0 6px;
-  line-height: 1.3;
+  margin: 6px 0 4px;
+  line-height: 1.25;
 }
 
 .chat-bubble.ai ul,
 .chat-bubble.ai ol {
-  margin: 6px 0 6px 18px;
-  padding-left: 14px;
+  margin: 4px 0 4px 18px;
+  padding-left: 16px;
 }
 
 .chat-bubble.ai li {
@@ -651,6 +631,10 @@ textarea {
 
 .chat-bubble.ai li p {
   margin: 0;
+}
+
+.chat-bubble.ai li > p:first-child {
+  display: inline;
 }
 
 .chat-bubble.ai br {

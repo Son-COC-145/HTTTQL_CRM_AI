@@ -21,5 +21,11 @@ public interface CustomerRepository extends JpaRepository<Customer, Long> {
     List<Object[]> countCustomersByStatus();
 
     List<Customer> findTop5ByOrderByPotentialScoreDesc();
+
+    List<Customer> findTop10ByOrderByPotentialScoreDesc();
+
+    List<Customer> findByStatus(String status);
+
+    List<Customer> findBySourceIgnoreCase(String source);
 }
 

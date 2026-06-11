@@ -4,6 +4,7 @@ import com.CrmAi.dto.AIResponseDto;
 import com.CrmAi.entity.AIAnalysis;
 import com.CrmAi.entity.Customer;
 import com.CrmAi.entity.Order;
+import com.CrmAi.entity.Task;
 import com.CrmAi.repository.AIAnalysisRepository;
 import com.CrmAi.repository.CustomerRepository;
 import com.CrmAi.repository.InteractionRepository;
@@ -115,47 +116,145 @@ public class AIService {
     }
 
     public ChatResponseDto chat(String question) {
-        List<Customer> customers = customerRepository.findAll();
-
-        Customer topCustomer = customers.stream()
-                .filter(c -> c.getPotentialScore() != null)
-                .max((c1, c2) -> c1.getPotentialScore().compareTo(c2.getPotentialScore()))
-                .orElse(null);
+        String lowerQuestion = question.toLowerCase();
 
         StringBuilder context = new StringBuilder();
 
-        context.append("Tổng số khách hàng: ")
-                .append(customers.size())
-                .append(".\n");
+        context.append("Dữ liệu CRM liên quan đến câu hỏi:\n\n");
 
-        if (topCustomer != null) {
-            context.append("Khách hàng tiềm năng nhất: ")
-                    .append(topCustomer.getFullName())
-                    .append(", điểm AI: ")
-                    .append(topCustomer.getPotentialScore())
-                    .append(", trạng thái: ")
-                    .append(topCustomer.getStatus())
-                    .append(".\n");
-        }
+        if (
+                lowerQuestion.contains("tiềm năng") ||
+                        lowerQuestion.contains("hot") ||
+                        lowerQuestion.contains("ưu tiên") ||
+                        lowerQuestion.contains("chăm sóc trước")
+        ) {
+            List<Customer> customers =
+                    customerRepository.findTop10ByOrderByPotentialScoreDesc();
 
-        for (Customer c : customers) {
-            context.append("- ")
-                    .append(c.getFullName())
-                    .append(" | điểm AI: ")
-                    .append(c.getPotentialScore())
-                    .append(" | trạng thái: ")
-                    .append(c.getStatus())
-                    .append(" | nguồn: ")
-                    .append(c.getSource())
-                    .append(".\n");
+            context.append("Top khách hàng có điểm AI cao nhất:\n");
+
+            for (Customer c : customers) {
+                context.append("- Tên: ")
+                        .append(c.getFullName())
+                        .append(", trạng thái: ")
+                        .append(c.getStatus())
+                        .append(", điểm AI: ")
+                        .append(c.getPotentialScore())
+                        .append(", nguồn: ")
+                        .append(c.getSource())
+                        .append(", ghi chú: ")
+                        .append(c.getNote())
+                        .append(".\n");
+            }
+
+        } else if (
+                lowerQuestion.contains("inactive") ||
+                        lowerQuestion.contains("không hoạt động") ||
+                        lowerQuestion.contains("ngừng hoạt động")
+        ) {
+            List<Customer> customers =
+                    customerRepository.findByStatus("INACTIVE");
+
+            context.append("Danh sách khách hàng không hoạt động:\n");
+
+            for (Customer c : customers) {
+                context.append("- Tên: ")
+                        .append(c.getFullName())
+                        .append(", điểm AI: ")
+                        .append(c.getPotentialScore())
+                        .append(", nguồn: ")
+                        .append(c.getSource())
+                        .append(", ghi chú: ")
+                        .append(c.getNote())
+                        .append(".\n");
+            }
+
+        } else if (
+                lowerQuestion.contains("task") ||
+                        lowerQuestion.contains("công việc") ||
+                        lowerQuestion.contains("deadline") ||
+                        lowerQuestion.contains("việc cần làm")
+        ) {
+            List<Task> tasks =
+                    taskRepository.findByStatusIn(List.of("TODO", "IN_PROGRESS"));
+
+            context.append("Các task chưa hoàn thành:\n");
+
+            for (Task t : tasks) {
+                context.append("- Task: ")
+                        .append(t.getTitle())
+                        .append(", mô tả: ")
+                        .append(t.getDescription())
+                        .append(", trạng thái: ")
+                        .append(t.getStatus())
+                        .append(", hạn xử lý: ")
+                        .append(t.getDueDate())
+                        .append(".\n");
+            }
+
+        } else if (
+                lowerQuestion.contains("facebook")
+        ) {
+            List<Customer> customers =
+                    customerRepository.findBySourceIgnoreCase("Facebook");
+
+            context.append("Khách hàng từ nguồn Facebook:\n");
+
+            for (Customer c : customers) {
+                context.append("- Tên: ")
+                        .append(c.getFullName())
+                        .append(", trạng thái: ")
+                        .append(c.getStatus())
+                        .append(", điểm AI: ")
+                        .append(c.getPotentialScore())
+                        .append(".\n");
+            }
+
+        } else if (
+                lowerQuestion.contains("website")
+        ) {
+            List<Customer> customers =
+                    customerRepository.findBySourceIgnoreCase("Website");
+
+            context.append("Khách hàng từ nguồn Website:\n");
+
+            for (Customer c : customers) {
+                context.append("- Tên: ")
+                        .append(c.getFullName())
+                        .append(", trạng thái: ")
+                        .append(c.getStatus())
+                        .append(", điểm AI: ")
+                        .append(c.getPotentialScore())
+                        .append(".\n");
+            }
+
+        } else {
+            List<Customer> customers =
+                    customerRepository.findTop10ByOrderByPotentialScoreDesc();
+
+            context.append("Tóm tắt top 10 khách hàng nổi bật:\n");
+
+            for (Customer c : customers) {
+                context.append("- Tên: ")
+                        .append(c.getFullName())
+                        .append(", trạng thái: ")
+                        .append(c.getStatus())
+                        .append(", điểm AI: ")
+                        .append(c.getPotentialScore())
+                        .append(", nguồn: ")
+                        .append(c.getSource())
+                        .append(".\n");
+            }
         }
 
         Map<String, Object> request = new HashMap<>();
         request.put("question", question);
         request.put("context", context.toString());
 
-        String url = "http://localhost:8000/ai/chat";
-
-        return restTemplate.postForObject(url, request, ChatResponseDto.class);
+        return restTemplate.postForObject(
+                "http://localhost:8000/ai/chat",
+                request,
+                ChatResponseDto.class
+        );
     }
 }

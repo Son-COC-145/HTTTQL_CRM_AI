@@ -13,6 +13,8 @@ public class CustomerService {
 
     private final CustomerRepository customerRepository;
 
+    private final CustomerEmbeddingService customerEmbeddingService;
+
     public List<Customer> getAllCustomers() {
         return customerRepository.findAll();
     }
@@ -23,7 +25,9 @@ public class CustomerService {
     }
 
     public Customer createCustomer(Customer customer) {
-        return customerRepository.save(customer);
+        Customer saved = customerRepository.save(customer);
+        customerEmbeddingService.syncCustomerEmbedding(saved);
+        return saved;
     }
 
     public Customer updateCustomer(Long id, Customer request) {
@@ -37,11 +41,14 @@ public class CustomerService {
         customer.setPotentialScore(request.getPotentialScore());
         customer.setNote(request.getNote());
 
-        return customerRepository.save(customer);
+        Customer saved = customerRepository.save(customer);
+        customerEmbeddingService.syncCustomerEmbedding(saved);
+        return saved;
     }
 
     public void deleteCustomer(Long id) {
         Customer customer = getCustomerById(id);
+        customerEmbeddingService.deleteByCustomerId(customer.getId());
         customerRepository.delete(customer);
     }
 
