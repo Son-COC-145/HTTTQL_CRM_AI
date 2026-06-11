@@ -149,6 +149,31 @@ function CustomerDetail({ customerId, onBack }) {
     }
   };
 
+  const createTaskFromAI = async () => {
+    if (!aiResult?.suggestedAction) {
+      toast.error("Chưa có đề xuất AI để tạo task!");
+      return;
+    }
+
+    try {
+      const tomorrow = new Date();
+      tomorrow.setDate(tomorrow.getDate() + 1);
+
+      await api.post(`/tasks/customer/${customerId}`, {
+        title: `AI đề xuất chăm sóc ${customer.fullName}`,
+        description: aiResult.suggestedAction,
+        status: "TODO",
+        dueDate: tomorrow.toISOString().slice(0, 16),
+      });
+
+      toast.success("Đã tạo task chăm sóc từ AI!");
+      fetchData();
+    } catch (error) {
+      console.error(error);
+      toast.error("Không thể tạo task từ AI!");
+    }
+  };
+
   if (!customer) return <p>Loading...</p>;
 
   return (
@@ -207,9 +232,23 @@ function CustomerDetail({ customerId, onBack }) {
         <div className="card">
           <h2>Kết quả AI</h2>
           <p><strong>Điểm:</strong> {aiResult.potentialScore}</p>
+          {aiResult.reasons && (
+            <div>
+              <h3>Vì sao AI chấm điểm này?</h3>
+
+              <ul>
+                {aiResult.reasons.map((reason, index) => (
+                  <li key={index}>{reason}</li>
+                ))}
+              </ul>
+            </div>
+          )}
           <p><strong>Level:</strong> {aiResult.level}</p>
           <p><strong>Tóm tắt:</strong> {aiResult.summary}</p>
           <p><strong>Đề xuất:</strong> {aiResult.suggestedAction}</p>
+          <button className="primary-btn" onClick={createTaskFromAI}>
+            Tạo task từ đề xuất AI
+          </button>
         </div>
       )}
 

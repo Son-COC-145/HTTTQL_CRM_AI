@@ -14,6 +14,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.web.client.RestTemplate;
 import com.CrmAi.dto.ChatResponseDto;
+import com.CrmAi.dto.RevenueForecastResponseDto;
 
 import java.math.BigDecimal;
 import java.util.HashMap;
@@ -31,6 +32,7 @@ public class AIService {
     private final OrderRepository orderRepository;
     private final TaskRepository taskRepository;
     private final AIAnalysisRepository aiAnalysisRepository;
+    private final AiChatHistoryService chatHistoryService;
 
     public AIResponseDto analyzeCustomerById(Long customerId) {
         Customer customer = customerRepository.findById(customerId)
@@ -251,10 +253,59 @@ public class AIService {
         request.put("question", question);
         request.put("context", context.toString());
 
-        return restTemplate.postForObject(
+        ChatResponseDto response = restTemplate.postForObject(
                 "http://localhost:8000/ai/chat",
                 request,
                 ChatResponseDto.class
+        );
+
+        if (response != null) {
+            chatHistoryService.save(question, response.getAnswer());
+        }
+
+        return response;
+    }
+    
+    public RevenueForecastResponseDto forecastRevenue(List<Double> monthlyRevenue) {
+        Map<String, Object> request = new HashMap<>();
+        request.put("monthlyRevenue", monthlyRevenue);
+
+        return restTemplate.postForObject(
+                "http://localhost:8000/ai/forecast-revenue",
+                request,
+                RevenueForecastResponseDto.class
+        );
+    }
+
+    public Object churnRisk(Long customerId) {
+        Customer customer = customerRepository.findById(customerId)
+                .orElseThrow(() -> new RuntimeException("Customer not found"));
+
+        int interactionCount = interactionRepository.findByCustomerId(customerId).size();
+        List<Order> orders = orderRepository.findByCustomerId(customerId);
+        int orderCount = orders.size();
+
+        BigDecimal totalSpent = orders.stream()
+                .map(Order::getAmount)
+                .filter(amount -> amount != null)
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
+
+        int taskCount = taskRepository.findByCustomerId(customerId).size();
+
+        Map<String, Object> request = new HashMap<>();
+        request.put("customer_id", customer.getId());
+        request.put("full_name", customer.getFullName());
+        request.put("status", customer.getStatus());
+        request.put("potential_score", customer.getPotentialScore());
+        request.put("interaction_count", interactionCount);
+        request.put("order_count", orderCount);
+        request.put("total_spent", totalSpent);
+        request.put("task_count", taskCount);
+
+        return restTemplate.postForObject(
+                "http://localhost:8000/ai/churn-risk",
+                request,
+                Object.class
         );
     }
 }

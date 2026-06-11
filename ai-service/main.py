@@ -7,9 +7,12 @@ from fastapi import FastAPI
 from pydantic import BaseModel
 import google.generativeai as genai
 
-from ml_scoring import calculate_ml_score, get_level
+from ml_scoring import calculate_ml_score, calculate_ml_score_with_reasons, get_level
 from rag.semantic_search import retrieve
 from services.embedding_service import create_embedding
+
+from sklearn.linear_model import LinearRegression
+import numpy as np
 
 app = FastAPI(title="CRM AI Service")
 
@@ -49,6 +52,18 @@ class EmbeddingRequest(BaseModel):
     customerId: int
     content: str
 
+class RevenueForecastRequest(BaseModel):
+    monthlyRevenue: list
+
+class ChurnRiskRequest(BaseModel):
+    customer_id: int
+    full_name: str
+    status: Optional[str] = None
+    potential_score: int = 0
+    interaction_count: int = 0
+    order_count: int = 0
+    total_spent: float = 0
+    task_count: int = 0
 
 @app.get("/")
 def health_check():
@@ -59,7 +74,7 @@ def health_check():
 
 @app.post("/ai/analyze-customer")
 def analyze_customer(data: CustomerAIRequest):
-    score = calculate_ml_score(data)
+    score, reasons = calculate_ml_score_with_reasons(data)
     level = get_level(score)
 
     prompt = f"""
@@ -99,7 +114,8 @@ Chỉ trả về JSON.
             "potentialScore": score,
             "level": level,
             "summary": result.get("summary", ""),
-            "suggestedAction": result.get("suggestedAction", "")
+            "suggestedAction": result.get("suggestedAction", ""),
+            "reasons": reasons
         }
 
     except Exception:
@@ -107,7 +123,8 @@ Chỉ trả về JSON.
             "potentialScore": score,
             "level": level,
             "summary": f"{data.full_name} được mô hình ML đánh giá thuộc nhóm {level} với điểm {score}.",
-            "suggestedAction": "Nên tiếp tục chăm sóc khách hàng dựa trên mức độ tiềm năng và lịch sử tương tác."
+            "suggestedAction": "Nên tiếp tục chăm sóc khách hàng dựa trên mức độ tiềm năng và lịch sử tương tác.",
+            "reasons": reasons
         }
 
 
@@ -220,4 +237,71 @@ def embedding(data: EmbeddingRequest):
 
         "embedding": vector
 
+    }
+
+@app.post("/ai/forecast-revenue")
+def forecast_revenue(data: RevenueForecastRequest):
+    revenues = data.monthlyRevenue
+
+    if len(revenues) < 2:
+        return {
+            "forecastRevenue": 0,
+            "message": "Không đủ dữ liệu để dự báo"
+        }
+
+    X = np.array(range(len(revenues))).reshape(-1, 1)
+    y = np.array(revenues)
+
+    model_lr = LinearRegression()
+    model_lr.fit(X, y)
+
+    next_month = np.array([[len(revenues)]])
+    forecast = model_lr.predict(next_month)[0]
+
+    return {
+        "forecastRevenue": round(float(forecast), 2),
+        "message": "Dự báo doanh thu tháng tiếp theo bằng Linear Regression"
+    }
+
+@app.post("/ai/churn-risk")
+def churn_risk(data: ChurnRiskRequest):
+    risk = 20
+    reasons = []
+
+    if data.status == "INACTIVE":
+        risk += 35
+        reasons.append("Khách hàng đang ở trạng thái không hoạt động")
+
+    if data.potential_score < 40:
+        risk += 20
+        reasons.append("Điểm AI thấp")
+
+    if data.interaction_count == 0:
+        risk += 15
+        reasons.append("Không có lịch sử tương tác gần đây")
+
+    if data.order_count == 0:
+        risk += 15
+        reasons.append("Chưa phát sinh đơn hàng")
+
+    if data.task_count == 0:
+        risk += 5
+        reasons.append("Chưa có task chăm sóc")
+
+    risk = min(risk, 100)
+
+    if risk >= 75:
+        level = "HIGH"
+    elif risk >= 45:
+        level = "MEDIUM"
+    else:
+        level = "LOW"
+
+    return {
+        "customerId": data.customer_id,
+        "customerName": data.full_name,
+        "churnRisk": risk,
+        "level": level,
+        "reasons": reasons,
+        "suggestedAction": "Nên tạo chiến dịch chăm sóc lại, gửi ưu đãi cá nhân hóa hoặc liên hệ trực tiếp để xác nhận nhu cầu."
     }

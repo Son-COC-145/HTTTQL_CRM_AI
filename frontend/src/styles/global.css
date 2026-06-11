@@ -640,3 +640,47 @@ textarea {
 .chat-bubble.ai br {
   display: none;
 }
+
+.ai-chat-layout {
+  display: grid;
+  grid-template-columns: 280px 1fr;
+  gap: 20px;
+}
+
+.history-panel {
+  background: white;
+  border-radius: 16px;
+  padding: 16px;
+  height: 620px;
+  overflow-y: auto;
+  box-shadow: 0 8px 22px rgba(15, 23, 42, 0.08);
+}
+
+.history-panel h3 {
+  margin-top: 0;
+}
+
+.history-item {
+  padding: 12px;
+  border-radius: 12px;
+  border-bottom: 1px solid #f1f5f9;
+  cursor: pointer;
+}
+
+.history-item:hover {
+  background: #f3f4f6;
+}
+
+.history-item strong {
+  display: block;
+  font-size: 14px;
+  margin-bottom: 6px;
+}
+
+.history-item small {
+  color: #6b7280;
+}
+
+.chat-main {
+  min-width: 0;
+}
